@@ -223,17 +223,17 @@ void Masterprocess(){
 		std::ofstream file_xL("xL.dat");
 		if (file_xL.is_open()){
 			file_xL << "V_fluid" << "\t" << "Pressure" << "\t" << "Strain_rate" << "\t" << "Hoop_stress" << "\n";
-		  file_xL << qLvec.row(0).transpose() << "\t" << qLvec.row(1).transpose() << "\t" << qLvec.row(2).transpose() << "\t" << qLvec.row(3).transpose() << "\n";
+		  file_xL << qLvec.transpose() << "\n";
 		}
 		std::ofstream file_x0("x0.dat");
 		if (file_x0.is_open()){
 		  file_x0 << "V_fluid" << "\t" << "Pressure" << "\t" << "Strain_rate" << "\t" << "Hoop_stress" << "\n";
-		  file_x0 << q0vec.row(0).transpose() << "\t" << q0vec.row(1).transpose() << "\t" << q0vec.row(2).transpose() << "\t" << q0vec.row(3).transpose() << "\n";
+		  file_x0 << q0vec.transpose() << "\n";
 		}
 		std::ofstream file_xt("xtest.dat");
 		if (file_xt.is_open()){
 		  file_xt << "V_fluid" << "\t" << "Pressure" << "\t" << "Strain_rate" << "\t" << "Hoop_stress" << "\n";
-		  file_xt << qtestvec.row(0).transpose() << "\t" << qtestvec.row(1).transpose() << "\t" << qtestvec.row(2).transpose() << "\t" << qtestvec.row(3).transpose() << "\n";
+		  file_xt << qtestvec.transpose() << "\n";
 		}	
 }
 
