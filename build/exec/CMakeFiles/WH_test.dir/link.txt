@@ -1,0 +1,1 @@
+mpicxx   -std=c++11 -O3 -Wall -Wconversion -Wshadow -g    CMakeFiles/WH_test.dir/__/src/boundary_interior_tau_wh.cc.o CMakeFiles/WH_test.dir/__/src/double_compares.cpp.o CMakeFiles/WH_test.dir/meshfree_main.cc.o  -o WH_test -rdynamic 
