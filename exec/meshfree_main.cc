@@ -1,8 +1,7 @@
-/*    Copyright (C) 2013  kklloh
-		Full FSI version - Main Program for Delft Hydraulics Problem
-    This program is free software; you can redistribute it and/or modify
+/** Full FSI version - Main Program for Delft Hydraulics Problem
+    This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    the Free Software Foundation, either version 2 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -10,17 +9,20 @@
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ kklloh
 */
 
 #include <cstdlib>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
+#include <sstream>
 #include <cmath>
-#include <Eigen/Dense>
-#include <Eigen/LU>
+#include <string>
+#include <../include/Eigen/Dense>
+#include <../include/Eigen/LU>
 #include <../include/boundary_interior_tau_wh.hh>
 #include <../include/Types.hh>
 #include <mpi.h>
@@ -34,11 +36,19 @@
 
 using namespace Eigen;
 
-void Masterprocess();
+void Masterprocess(const realscalar&);
 void Slaveprocess();
+std::string convertInt(int number);
 
 int numprocs, myrank;
 MPI_Status status;
+
+std::string convertReal(const realscalar &number)
+{
+   std::stringstream ss;//create a stringstream
+   ss << number;//add number to the stream
+   return ss.str();//return a string with the contents of the stream
+}
 
 int main(int argc, char *argv[]){
 	int result = MPI_Init(&argc,&argv);
@@ -46,9 +56,11 @@ int main(int argc, char *argv[]){
 	MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
 	MPI_Barrier(MPI_COMM_WORLD);
+	realscalar cdd = std::atof(argv[1]);
 	start = MPI_Wtime();
 	if(myrank == 0){
-		Masterprocess();
+		Masterprocess(cdd);
+//		std::cout << "Ok! \n" << std::endl;
 	}
 	else{
 		Slaveprocess();
@@ -57,24 +69,32 @@ int main(int argc, char *argv[]){
 	end = MPI_Wtime();
 	MPI_Finalize();
 	if (myrank == 0){ /* use time on master node */
-    std::cout << "Runtime = " << end-start << " sec" << std::endl;
+	std::string timings_name;
+	timings_name = std::string("timings_");
+	timings_name += convertInt(numprocs);
+	timings_name += std::string(".dat");
+	std::ofstream file_timings(timings_name);
+	if (file_timings.is_open()){
+	  file_timings << end-start << '\n';
+	}
+//    std::cout << "Runtime = " << end-start << " sec" << std::endl;
   }
 	return 0;
 }
 
-void Masterprocess(){
+void Masterprocess(const realscalar& cdd){
 		realscalar L = 20.;
-		realscalar R = 398.5e-3;
-		realscalar ee = 8e-3;
+		realscalar R = 0.3985;//0.3587; //398.5e-3;
+		realscalar ee = 0.008;//0.001;//8e-3;
 		realscalar E = 210e9;
 		realscalar rho_t = 7985;
 		realscalar nu = 0.29;
 		realscalar K_w = 2.14e9;
 		realscalar rho_f = 998;
-		realscalar Tc = 0.03;
+		realscalar Tc = 0.03;//0.003;//0.03;
 		realscalar Q0 = 0.5;
 		realscalar zeta0 = 0.2;
-		realscalar Cd = 0;
+		realscalar Cd = cdd;//5.6104e18;
 
 		realscalar Af = PI*std::pow(R,2);
 		realscalar At = PI*(std::pow(R+ee,2) - std::pow(R,2));
@@ -144,13 +164,14 @@ void Masterprocess(){
 		//Define initial conditions
 		realscalar V0 = Q0/Af;
 		realscalar P0 = zeta0*1/2*rho_f*V0*std::abs(V0);
+		realscalar Pj0 = rho_f*V0*l1;
 		Matrix<realscalar,4,1> qIC;
 		qIC	<< V0,P0,0,Af*P0/At;
 		Matrix<realscalar,Dynamic,1> wIC;
 		wIC = S.inverse()*qIC;
 
 		// Test case
-		realscalar xtest = 11.15;
+		realscalar xtest = 10;
 		realscalar Tend = 0.2;
 		realscalar dt = 0.001;// %1.45673544858331e-4;
 		unsigned int N = std::ceil(Tend/dt);
@@ -185,7 +206,7 @@ void Masterprocess(){
 
 		int total_work = N+1;
 		MPI_Request request;
-		int i, ii = 0;
+		int i, ii = 0; // We haven't finished any useful work
 		// Send task to slaves
 		whomax = numprocs - 1;
 		if (whomax > total_work)
@@ -205,7 +226,7 @@ void Masterprocess(){
 			qLvec.col(i) = S*WL.col(i);
 			wtest.col(i) = Sendrecvpack.segment(8,4);//interior_wh(xtest,Tc,ti(i),qIC,wIC,S,L,l1,l2,l3,l4,Af,At,Cd);
 			qtestvec.col(i) = S*wtest.col(i);
-			std::cout << Sendrecvpack(12) << std::endl;
+//			std::cout << Sendrecvpack(12) << std::endl;
 			++received_answers;
 			if (ii < N+1){
 				MPI_Send(&ii,1,MPI_INT,who,WORKTAG,MPI_COMM_WORLD);
@@ -216,25 +237,42 @@ void Masterprocess(){
 		for (who = 1; who < numprocs; ++who){
 			MPI_Send(&xtest,1,MPI_INT,who,DIETAG,MPI_COMM_WORLD);
 		}
-		std::ofstream file_t("time.dat");
+		
+		std::string timename, qLname, q0name, qtestname;
+		std::string numberprocs(convertInt(numprocs));
+		std::string scd(convertReal(Cd));
+		timename = std::string("time_") + numberprocs + std::string("_") + scd + std::string(".dat");
+		qLname = std::string("qL_") + numberprocs + std::string("_") + scd + std::string(".dat");
+		q0name = std::string("q0_") + numberprocs + std::string("_") + scd + std::string(".dat");
+		qtestname = std::string("qtest_") + numberprocs + std::string("_") + scd + std::string(".dat");
+		std::ofstream file_t(timename.c_str());
 		if (file_t.is_open()){
 		  file_t << ti << '\n';
 		}
-		std::ofstream file_xL("xL.dat");
-		if (file_xL.is_open()){
-			file_xL << "V_fluid" << "\t" << "Pressure" << "\t" << "Strain_rate" << "\t" << "Hoop_stress" << "\n";
-		  file_xL << qLvec.transpose() << "\n";
+		std::ofstream file_qL(qLname.c_str());
+		if (file_qL.is_open()){
+		  file_qL << qLvec.transpose() << '\n';
 		}
-		std::ofstream file_x0("x0.dat");
-		if (file_x0.is_open()){
-		  file_x0 << "V_fluid" << "\t" << "Pressure" << "\t" << "Strain_rate" << "\t" << "Hoop_stress" << "\n";
-		  file_x0 << q0vec.transpose() << "\n";
+		std::ofstream file_q0(q0name.c_str());
+		if (file_q0.is_open()){
+		  file_q0 << q0vec.transpose() << '\n';
 		}
-		std::ofstream file_xt("xtest.dat");
-		if (file_xt.is_open()){
-		  file_xt << "V_fluid" << "\t" << "Pressure" << "\t" << "Strain_rate" << "\t" << "Hoop_stress" << "\n";
-		  file_xt << qtestvec.transpose() << "\n";
-		}	
+		std::ofstream file_qtest(qtestname.c_str());
+		if (file_qtest.is_open()){
+		  file_qtest << qtestvec.transpose() << '\n';
+		}
+		//Matrix<realscalar,Dynamic,1> Pm(3);
+		//Pm	<< qLvec.cwiseMax(2),q0vec.cwiseMax(2),qtestvec.cwiseMax(2);
+		Matrix<realscalar,Dynamic,Dynamic> qLT, q0T, qtestT;
+		qLT = qLvec.transpose();
+		q0T = q0vec.transpose();
+		qtestT = qtestvec.transpose();
+		Matrix<realscalar,3,1> PMvec;
+//		PMvec << qLT.col(1).maxCoeff(),q0T.col(1).maxCoeff(),qtestT.col(1).maxCoeff();
+		realscalar sss1 = qLT.col(1).maxCoeff(), sss2 = q0T.col(1).maxCoeff(), sss3 = qtestT.col(1).maxCoeff();
+		PMvec << sss1,sss2,sss3;
+		std::cout << cdd << "\t" << std::setprecision(12) << PMvec.maxCoeff()/Pj0 << "\t" << Pj0 << std::endl;
+//		std::cout << "max|P|/Pj = " << ratP << std::endl;
 }
 
 void Slaveprocess(){
@@ -269,14 +307,26 @@ void Slaveprocess(){
 			W0 = boundary_wh(0.,Tc,ti(job),qIC,wIC,S,L,l1,l2,l3,l4,Af,At,Cd);
 			WL = boundary_wh(L,Tc,ti(job),qIC,wIC,S,L,l1,l2,l3,l4,Af,At,Cd);
 			Wtest = interior_wh(xtest,Tc,ti(job),qIC,wIC,S,L,l1,l2,l3,l4,Af,At,Cd);
+//			std::cout << "Packing data from processor " << myrank << std::endl;
 			Sendrecvpack.segment(0,4) = W0;
+//			std::cout << "Packing data 1 from processor " << myrank << std::endl;
 			Sendrecvpack.segment(4,4) = WL;
+//			std::cout << "Packing data 2 from processor " << myrank << std::endl;
 			Sendrecvpack.segment(8,4) = Wtest;
+//			std::cout << "Packing data 3 from processor " << myrank << std::endl;
 			Sendrecvpack(12) = (double)job;
 			MPI_Send(Sendrecvpack.data(),Sendrecvpack.size(),MPI_DOUBLE,0,WORKTAG,MPI_COMM_WORLD);
+//			std::cout << "Sent data to root\n";
 			MPI_Recv(&job,1,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,&status);	
 			if(status.MPI_TAG == DIETAG)
 				break;
 		}
 	}
+}
+
+std::string convertInt(int number)
+{
+   std::stringstream ss;//create a stringstream
+   ss << number;//add number to the stream
+   return ss.str();//return a string with the contents of the stream
 }
