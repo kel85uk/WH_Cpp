@@ -21,11 +21,11 @@
 #include <sstream>
 #include <cmath>
 #include <string>
-#include <../include/Eigen/Dense>
-#include <../include/Eigen/LU>
-#include <../include/boundary_interior_tau_wh.hh>
-#include <../include/Types.hh>
-#include <mpi.h>
+#include "../include/Eigen/Dense"
+#include "../include/Eigen/LU"
+#include "../include/boundary_interior_tau_wh.hh"
+#include "../include/Types.hh"
+#include "mpi.h"
 
 #ifndef PI
 #define PI (4*atan(1))

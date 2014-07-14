@@ -18,8 +18,8 @@
 #define boundary_interior_tau_HH
 #include <cmath>
 #include <iostream>
-#include <Eigen/Dense>
-#include <Eigen/LU>
+#include "../include/Eigen/Dense"
+#include "../include/Eigen/LU"
 #include <../include/Types.hh>
 #include <../include/double_compares.h>
 
